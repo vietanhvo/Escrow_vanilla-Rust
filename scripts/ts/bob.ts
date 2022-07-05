@@ -26,6 +26,8 @@ const bob = async () => {
   const terms = getTerms();
 
   const connection = new Connection("http://localhost:8899", "confirmed");
+
+  // Get escrow's account information and decode its state
   const escrowAccount = await connection.getAccountInfo(
     escrowStateAccountPubkey
   );
@@ -53,11 +55,13 @@ const bob = async () => {
     expectedAmount: new BN(decodedEscrowLayout.expectedAmount, 10, "le"),
   };
 
+  // Create a new PDA for escrow program
   const PDA = await PublicKey.findProgramAddress(
     [Buffer.from("escrow")],
     escrowProgramId
   );
 
+  // Create an instruction to call exchange with the Escrow program
   const exchangeInstruction = new TransactionInstruction({
     programId: escrowProgramId,
     data: Buffer.from(
@@ -94,6 +98,7 @@ const bob = async () => {
     getTokenBalance(bobXTokenAccountPubkey, connection),
   ]);
 
+  // Send the transaction with only the exchange instruction
   console.log("Sending Bob's transaction...");
   await connection.sendTransaction(
     new Transaction().add(exchangeInstruction),
@@ -104,6 +109,7 @@ const bob = async () => {
   // sleep to allow time to update
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
+  // Check the token balances and the status of accounts
   if ((await connection.getAccountInfo(escrowStateAccountPubkey)) !== null) {
     logError("Escrow account has not been closed");
     process.exit(1);

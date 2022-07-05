@@ -32,6 +32,8 @@ const alice = async () => {
 
   const tempXTokenAccountKeypair = new Keypair();
   const connection = new Connection("http://localhost:8899", "confirmed");
+
+  // Create new account for Alice temp X account (empty account)
   const createTempTokenAccountIx = SystemProgram.createAccount({
     programId: TOKEN_PROGRAM_ID,
     space: AccountLayout.span,
@@ -41,12 +43,15 @@ const alice = async () => {
     fromPubkey: aliceKeypair.publicKey,
     newAccountPubkey: tempXTokenAccountKeypair.publicKey,
   });
+  // After empty account created, set information for Alice temp X account
   const initTempAccountIx = Token.createInitAccountInstruction(
     TOKEN_PROGRAM_ID,
     XTokenMintPubkey,
     tempXTokenAccountKeypair.publicKey,
     aliceKeypair.publicKey
   );
+
+  // Create an instruction to transfer X from Alice's main X account to Alice's temp X account
   const transferXTokensToTempAccIx = Token.createTransferInstruction(
     TOKEN_PROGRAM_ID,
     aliceXTokenAccountPubkey,
@@ -55,16 +60,19 @@ const alice = async () => {
     [],
     terms.bobExpectedAmount
   );
+
+  // Create a new Escrow's account to store data (empty account)
   const escrowKeypair = new Keypair();
   const createEscrowAccountIx = SystemProgram.createAccount({
     space: ESCROW_ACCOUNT_DATA_LAYOUT.span,
     lamports: await connection.getMinimumBalanceForRentExemption(
       ESCROW_ACCOUNT_DATA_LAYOUT.span
     ),
-    fromPubkey: aliceKeypair.publicKey,
-    newAccountPubkey: escrowKeypair.publicKey,
-    programId: escrowProgramId,
+    fromPubkey: aliceKeypair.publicKey, // Get lamport from Alice's main account
+    newAccountPubkey: escrowKeypair.publicKey, // Address for this account
+    programId: escrowProgramId, //Owner
   });
+  // Create a new instruction for calling the init escrow program (init the previous empty account)
   const initEscrowIx = new TransactionInstruction({
     programId: escrowProgramId,
     keys: [
@@ -88,6 +96,7 @@ const alice = async () => {
     ),
   });
 
+  // Combine all instructions into a single transaction
   const tx = new Transaction().add(
     createTempTokenAccountIx,
     initTempAccountIx,
@@ -95,6 +104,7 @@ const alice = async () => {
     createEscrowAccountIx,
     initEscrowIx
   );
+  // Send the transaction to the node
   console.log("Sending Alice's transaction...");
   await connection.sendTransaction(
     tx,
@@ -105,6 +115,7 @@ const alice = async () => {
   // sleep to allow time to update
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
+  // Retrieve the escrow account already created
   const escrowAccount = await connection.getAccountInfo(
     escrowKeypair.publicKey
   );
@@ -153,6 +164,7 @@ const alice = async () => {
   console.log(
     `✨Escrow successfully initialized. Alice is offering ${terms.bobExpectedAmount}X for ${terms.aliceExpectedAmount}Y✨\n`
   );
+  // Create escrow_pub.json to store the escrow's ACCOUNT public key
   writePublicKey(escrowKeypair.publicKey, "escrow");
   console.table([
     {
